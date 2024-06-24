@@ -53,7 +53,7 @@
       const threeCanvas = document.getElementById("threeCanvas");
 
       let renderer, scene, camera;
-      let glasess;
+      let necklace, hat, occluder, neckOccluder, glasess, earring;
       const faceLandmarks = [];
 
       // Function to start the video stream
@@ -95,14 +95,15 @@
         renderer.setSize(threeCanvas.width, threeCanvas.height);
         renderer.autoClear = false;
         scene = new THREE.Scene();
-        camera = new THREE.PerspectiveCamera(
-          80,
-          threeCanvas.width / threeCanvas.height,
-          0.1,
+        camera = new THREE.OrthographicCamera(
+          -threeCanvas.width / 2,
+          threeCanvas.width / 2,
+          threeCanvas.height / 2,
+          -threeCanvas.height / 2,
+          -1000,
           1000
         );
-
-        camera.position.z = 500;
+        camera.position.z = 1;
 
         const pmremGenerator = new THREE.PMREMGenerator(renderer);
         pmremGenerator.compileEquirectangularShader();
@@ -132,7 +133,45 @@
       const loader = new THREE.GLTFLoader();
 
       loader.load(
-        "sunglasses.glb",
+        "neck.glb",
+        (gltf) => {
+          necklace = gltf.scene;
+          necklace.traverse((child) => {
+            if (child.isMesh) {
+              child.renderOrder = 2; // Pastikan gelang dirender setelah occluder
+            }
+          });
+
+          scene.add(necklace);
+          console.log("neck model loaded successfully");
+        },
+        undefined,
+        (error) => {
+          console.error("An error occurred loading the hat model: ", error);
+        }
+      );
+
+      loader.load(
+        "hat6.glb",
+        (gltf) => {
+          hat = gltf.scene;
+          hat.traverse((child) => {
+            if (child.isMesh) {
+              child.renderOrder = 2; // Pastikan gelang dirender setelah occluder
+            }
+          });
+
+          scene.add(hat);
+          console.log("hat model loaded successfully");
+        },
+        undefined,
+        (error) => {
+          console.error("An error occurred loading the hat model: ", error);
+        }
+      );
+
+      loader.load(
+        "glasess.glb",
         (gltf) => {
           glasess = gltf.scene;
           glasess.traverse((child) => {
@@ -147,6 +186,77 @@
         undefined,
         (error) => {
           console.error("An error occurred loading the glasess model: ", error);
+        }
+      );
+
+      loader.load(
+        "earring2.glb",
+        (gltf) => {
+          earring = gltf.scene;
+          earring.traverse((child) => {
+            if (child.isMesh) {
+              child.renderOrder = 2; // Pastikan gelang dirender setelah occluder
+            }
+          });
+
+          scene.add(earring);
+          console.log("earring model loaded successfully");
+        },
+        undefined,
+        (error) => {
+          console.error("An error occurred loading the earring model: ", error);
+        }
+      );
+
+      loader.load(
+        "headOccluder.glb",
+        (gltf) => {
+          occluder = gltf.scene;
+          occluder.traverse((child) => {
+            if (child.isMesh) {
+              child.material = new THREE.MeshBasicMaterial({
+                colorWrite: false, // Menonaktifkan penulisan warna
+                depthWrite: true, // Tetap menulis ke buffer kedalama
+              });
+              child.renderOrder = 1; // Pastikan occluder dirender pertama kali
+            }
+          });
+
+          scene.add(occluder);
+          console.log("occluder model loaded successfully");
+        },
+        undefined,
+        (error) => {
+          console.error(
+            "An error occurred loading the occluder model: ",
+            error
+          );
+        }
+      );
+
+      loader.load(
+        "neckOccluder.glb",
+        (gltf) => {
+          neckOccluder = gltf.scene;
+          neckOccluder.traverse((child) => {
+            if (child.isMesh) {
+              child.material = new THREE.MeshBasicMaterial({
+                colorWrite: false, // Menonaktifkan penulisan warna
+                depthWrite: true, // Tetap menulis ke buffer kedalama
+              });
+              child.renderOrder = 1; // Pastikan neckOccluder dirender pertama kali
+            }
+          });
+
+          scene.add(neckOccluder);
+          console.log("neckOccluder model loaded successfully");
+        },
+        undefined,
+        (error) => {
+          console.error(
+            "An error occurred loading the neckOccluder model: ",
+            error
+          );
         }
       );
 
@@ -178,25 +288,78 @@
           const landmarks = results.multiFaceLandmarks[0];
 
           if (landmarks) {
+            const topHead = landmarks[10];
+            const centerHead = landmarks[1];
             const centerEye = landmarks[168];
+            const leftBottomEar = landmarks[132];
+            const neckLandmark = landmarks[454];
 
             // Position and scale the bracelet
-            const glasessSize = calculateDistance(
-              landmarks[162],
-              landmarks[389]
-            );
+            const faceSize = calculateDistance(landmarks[162], landmarks[389]);
+            const neckDistance =
+              calculateDistance(landmarks[197], landmarks[152]) * 1000;
+            const neckDepth =
+              calculateDistance(landmarks[197], landmarks[234]) * 1020;
+
+            const topHeadX =
+              (1 - topHead.x) * outputCanvas.width - outputCanvas.width / 2;
+            const topHeadY =
+              -topHead.y * outputCanvas.height + outputCanvas.height / 2;
+            const topHeadZ = -topHead.z * 100;
+
+            const centerHeadX =
+              (1 - centerHead.x) * outputCanvas.width - outputCanvas.width / 2;
+            const centerHeadY =
+              -centerHead.y * outputCanvas.height + outputCanvas.height / 2;
+            const centerHeadZ = -centerHead.z * 100;
+
             const centerEyeX =
               (1 - centerEye.x) * outputCanvas.width - outputCanvas.width / 2;
             const centerEyeY =
               -centerEye.y * outputCanvas.height + outputCanvas.height / 2;
             const centerEyeZ = -centerEye.z * 100;
 
+            const leftBottomEarX =
+              (1 - leftBottomEar.x) * outputCanvas.width -
+              outputCanvas.width / 2;
+            const leftBottomEarY =
+              -leftBottomEar.y * outputCanvas.height + outputCanvas.height / 2;
+            const leftBottomEarZ = -leftBottomEar.z * 100;
+
+            const neckLandmarkX =
+              (1 - neckLandmark.x) * outputCanvas.width -
+              outputCanvas.width / 2;
+            const neckLandmarkY =
+              -neckLandmark.y * outputCanvas.height + outputCanvas.height / 2;
+            const neckLandmarkZ = -neckLandmark.z * 100;
+
             glasess.position.set(centerEyeX, centerEyeY, centerEyeZ);
-            glasess.scale.set(
-              glasessSize * 420,
-              glasessSize * 420,
-              glasessSize * 420
+            necklace.position.set(
+              neckLandmarkX + neckDistance / 3.5,
+              neckLandmarkY - neckDistance,
+              neckLandmarkZ + neckDepth
             );
+            hat.position.set(topHeadX, topHeadY, topHeadZ);
+            earring.position.set(
+              leftBottomEarX + 15,
+              leftBottomEarY,
+              leftBottomEarZ - 30
+            );
+
+            occluder.position.set(centerHeadX, centerHeadY, centerHeadZ);
+            neckOccluder.position.set(
+              neckLandmarkX + neckDistance / 3.5,
+              neckLandmarkY - neckDistance + neckDistance / 2.25,
+              neckLandmarkZ + neckDepth
+            );
+
+            neckOccluder.scale.set(faceSize * 60, faceSize * 60, faceSize * 60);
+            necklace.scale.set(faceSize * 80, faceSize * 80, faceSize * 80);
+
+            occluder.scale.set(faceSize * 50, faceSize * 40, faceSize * 50);
+            hat.scale.set(faceSize * 110, faceSize * 110, faceSize * 110);
+            glasess.scale.set(faceSize * 110, faceSize * 110, faceSize * 110);
+            earring.scale.set(10, 10, 10);
 
             // Extract necessary landmarks
             const nose = landmarks[1];
@@ -236,6 +399,10 @@
               rotationMatrix
             );
 
+            const quaternionNeck = new THREE.Quaternion().setFromRotationMatrix(
+              rotationMatrix
+            );
+
             // Correct the quaternion if needed
             quaternion.multiply(
               new THREE.Quaternion().setFromAxisAngle(
@@ -244,9 +411,22 @@
               )
             );
 
-            glasess.setRotationFromQuaternion(quaternion);
+            // Correct the quaternion if needed
+            quaternionNeck.multiply(
+              new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(0, 1, 0),
+                Math.PI
+              )
+            );
 
+            necklace.setRotationFromQuaternion(quaternionNeck);
+            neckOccluder.setRotationFromQuaternion(quaternionNeck);
+
+            hat.setRotationFromQuaternion(quaternion);
             glasess.setRotationFromQuaternion(quaternion);
+            earring.setRotationFromQuaternion(quaternion);
+
+            occluder.setRotationFromQuaternion(quaternion);
           }
         }
 

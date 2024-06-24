@@ -53,7 +53,7 @@
       const threeCanvas = document.getElementById("threeCanvas");
 
       let renderer, scene, camera;
-      let hat, occluder, glasess, earring;
+      let necklace, hat, occluder, neckOccluder, glasess, earring;
       const faceLandmarks = [];
 
       // Function to start the video stream
@@ -131,6 +131,25 @@
       }
 
       const loader = new THREE.GLTFLoader();
+
+      loader.load(
+        "neck.glb",
+        (gltf) => {
+          necklace = gltf.scene;
+          necklace.traverse((child) => {
+            if (child.isMesh) {
+              child.renderOrder = 2; // Pastikan gelang dirender setelah occluder
+            }
+          });
+
+          scene.add(necklace);
+          console.log("neck model loaded successfully");
+        },
+        undefined,
+        (error) => {
+          console.error("An error occurred loading the hat model: ", error);
+        }
+      );
 
       loader.load(
         "hat6.glb",
@@ -215,6 +234,32 @@
         }
       );
 
+      loader.load(
+        "neckOccluder.glb",
+        (gltf) => {
+          neckOccluder = gltf.scene;
+          neckOccluder.traverse((child) => {
+            if (child.isMesh) {
+              child.material = new THREE.MeshBasicMaterial({
+                colorWrite: false, // Menonaktifkan penulisan warna
+                depthWrite: true, // Tetap menulis ke buffer kedalama
+              });
+              child.renderOrder = 1; // Pastikan neckOccluder dirender pertama kali
+            }
+          });
+
+          scene.add(neckOccluder);
+          console.log("neckOccluder model loaded successfully");
+        },
+        undefined,
+        (error) => {
+          console.error(
+            "An error occurred loading the neckOccluder model: ",
+            error
+          );
+        }
+      );
+
       // Function to calculate the distance between two landmarks
       function calculateDistance(landmark1, landmark2) {
         const dx = landmark1.x - landmark2.x;
@@ -247,9 +292,14 @@
             const centerHead = landmarks[1];
             const centerEye = landmarks[168];
             const leftBottomEar = landmarks[132];
+            const neckLandmark = landmarks[454];
 
             // Position and scale the bracelet
             const faceSize = calculateDistance(landmarks[162], landmarks[389]);
+            const neckDistance =
+              calculateDistance(landmarks[197], landmarks[152]) * 1000;
+            const neckDepth =
+              calculateDistance(landmarks[197], landmarks[234]) * 1020;
 
             const topHeadX =
               (1 - topHead.x) * outputCanvas.width - outputCanvas.width / 2;
@@ -276,17 +326,38 @@
               -leftBottomEar.y * outputCanvas.height + outputCanvas.height / 2;
             const leftBottomEarZ = -leftBottomEar.z * 100;
 
+            const neckLandmarkX =
+              (1 - neckLandmark.x) * outputCanvas.width -
+              outputCanvas.width / 2;
+            const neckLandmarkY =
+              -neckLandmark.y * outputCanvas.height + outputCanvas.height / 2;
+            const neckLandmarkZ = -neckLandmark.z * 100;
+
             glasess.position.set(centerEyeX, centerEyeY, centerEyeZ);
+            necklace.position.set(
+              neckLandmarkX + neckDistance / 3.5,
+              neckLandmarkY - neckDistance,
+              neckLandmarkZ + neckDepth
+            );
             hat.position.set(topHeadX, topHeadY, topHeadZ);
             earring.position.set(
               leftBottomEarX + 15,
               leftBottomEarY,
               leftBottomEarZ - 30
             );
-            occluder.position.set(centerHeadX, centerHeadY, centerHeadZ);
 
-            hat.scale.set(faceSize * 110, faceSize * 110, faceSize * 110);
+            occluder.position.set(centerHeadX, centerHeadY, centerHeadZ);
+            neckOccluder.position.set(
+              neckLandmarkX + neckDistance / 3.5,
+              neckLandmarkY - neckDistance + neckDistance / 2.25,
+              neckLandmarkZ + neckDepth
+            );
+
+            neckOccluder.scale.set(faceSize * 60, faceSize * 60, faceSize * 60);
+            necklace.scale.set(faceSize * 80, faceSize * 80, faceSize * 80);
+
             occluder.scale.set(faceSize * 50, faceSize * 40, faceSize * 50);
+            hat.scale.set(faceSize * 110, faceSize * 110, faceSize * 110);
             glasess.scale.set(faceSize * 110, faceSize * 110, faceSize * 110);
             earring.scale.set(10, 10, 10);
 
@@ -328,6 +399,10 @@
               rotationMatrix
             );
 
+            const quaternionNeck = new THREE.Quaternion().setFromRotationMatrix(
+              rotationMatrix
+            );
+
             // Correct the quaternion if needed
             quaternion.multiply(
               new THREE.Quaternion().setFromAxisAngle(
@@ -336,10 +411,22 @@
               )
             );
 
+            // Correct the quaternion if needed
+            quaternionNeck.multiply(
+              new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(0, 1, 0),
+                Math.PI
+              )
+            );
+
+            necklace.setRotationFromQuaternion(quaternionNeck);
+            neckOccluder.setRotationFromQuaternion(quaternionNeck);
+
             hat.setRotationFromQuaternion(quaternion);
-            occluder.setRotationFromQuaternion(quaternion);
             glasess.setRotationFromQuaternion(quaternion);
             earring.setRotationFromQuaternion(quaternion);
+
+            occluder.setRotationFromQuaternion(quaternion);
           }
         }
 
